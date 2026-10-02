@@ -10,13 +10,13 @@ pipeline {
     parameters {
         string(name: 'KUBE_NAMESPACE', defaultValue: 'ociqueue', description: 'Namespace of the existing webhook Helm release')
         string(name: 'HELM_RELEASE', defaultValue: 'ociqueue-webhook', description: 'Existing webhook Helm release name')
+        string(name: 'OCI_PROFILE', defaultValue: 'DEFAULT', description: 'Profile in the OCI CLI config used for OKE authentication')
     }
 
     environment {
         IMAGE_REPOSITORY = 'eu-frankfurt-1.ocir.io/idr1ghk373xi/ociqueue_webhook'
         OCIR_HOST = 'eu-frankfurt-1.ocir.io'
         CHART = 'webhook'
-        OCI_CLI_AUTH = 'instance_principal'
     }
 
     stages {
@@ -40,7 +40,23 @@ pipeline {
                     set -eu
                     command -v docker >/dev/null || { echo 'Docker CLI is missing on this Jenkins node'; exit 1; }
                     command -v helm >/dev/null || { echo 'Helm is missing on this Jenkins node'; exit 1; }
+                    command -v oci >/dev/null || { echo 'OCI CLI is missing on this Jenkins node'; exit 1; }
                     docker info >/dev/null || { echo 'Jenkins cannot access the Docker daemon'; exit 1; }
+                '''
+            }
+        }
+
+        stage('Source safety') {
+            steps {
+                sh '''
+                    set -eu
+                    for file in key.pem cert.pem docker_files.zip; do
+                      if git ls-files --error-unmatch "$file" >/dev/null 2>&1; then
+                        echo "Remove $file from Git before building"
+                        exit 1
+                      fi
+                    done
+                    test -d "$CHART/templates" || { echo 'Helm templates directory is missing'; exit 1; }
                 '''
             }
         }
@@ -65,10 +81,17 @@ pipeline {
                         error('Set KUBE_NAMESPACE and HELM_RELEASE to the running webhook deployment before enabling deployment.')
                     }
                 }
-                withCredentials([file(credentialsId: 'oke-kubeconfig', variable: 'KUBECONFIG_FILE')]) {
+                withCredentials([
+                    file(credentialsId: 'oke-kubeconfig', variable: 'KUBECONFIG_FILE'),
+                    file(credentialsId: 'oci-cli-config', variable: 'OCI_CLI_CONFIG_FILE'),
+                    file(credentialsId: 'oci-api-key', variable: 'OCI_CLI_KEY_FILE')
+                ]) {
                     sh '''
+                        set +x
                         set -eu
                         export KUBECONFIG="$KUBECONFIG_FILE"
+                        export OCI_CLI_AUTH=api_key
+                        export OCI_CLI_PROFILE="$OCI_PROFILE"
                         helm status "$HELM_RELEASE" --namespace "$KUBE_NAMESPACE" >/dev/null
                     '''
                 }
@@ -95,10 +118,17 @@ pipeline {
         stage('Deploy to OKE') {
             when { expression { env.DEPLOY_FROM_MAIN == 'true' } }
             steps {
-                withCredentials([file(credentialsId: 'oke-kubeconfig', variable: 'KUBECONFIG_FILE')]) {
+                withCredentials([
+                    file(credentialsId: 'oke-kubeconfig', variable: 'KUBECONFIG_FILE'),
+                    file(credentialsId: 'oci-cli-config', variable: 'OCI_CLI_CONFIG_FILE'),
+                    file(credentialsId: 'oci-api-key', variable: 'OCI_CLI_KEY_FILE')
+                ]) {
                     sh '''
+                        set +x
                         set -eu
                         export KUBECONFIG="$KUBECONFIG_FILE"
+                        export OCI_CLI_AUTH=api_key
+                        export OCI_CLI_PROFILE="$OCI_PROFILE"
                         helm upgrade "$HELM_RELEASE" "$CHART" \
                           --namespace "$KUBE_NAMESPACE" \
                           --reuse-values \
