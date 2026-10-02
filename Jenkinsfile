@@ -46,6 +46,22 @@ pipeline {
             }
         }
 
+        stage('Source safety') {
+            steps {
+                sh '''
+                    set -eu
+                    for file in key.pem cert.pem docker_files.zip; do
+                      if git ls-files --error-unmatch "$file" >/dev/null 2>&1; then
+                        echo "Remove $file from Git before building"
+                        exit 1
+                      fi
+                    done
+                    test -d "$CHART/templates" || { echo 'Helm templates directory is missing'; exit 1; }
+                '''
+            }
+        }
+
+
         stage('Build and lint') {
             steps {
                 sh '''
@@ -75,7 +91,7 @@ pipeline {
                         set -eu
                         export KUBECONFIG="$KUBECONFIG_FILE"
                         export OCI_CLI_AUTH=api_key
-                        export OCI_CLI_PROFILE="$OCI_PROFILE"
+                        export OCI_CLI_PROFILE="${OCI_PROFILE:-DEFAULT}"
                         helm status "$HELM_RELEASE" --namespace "$KUBE_NAMESPACE" >/dev/null
                     '''
                 }
@@ -112,7 +128,7 @@ pipeline {
                         set -eu
                         export KUBECONFIG="$KUBECONFIG_FILE"
                         export OCI_CLI_AUTH=api_key
-                        export OCI_CLI_PROFILE="$OCI_PROFILE"
+                        export OCI_CLI_PROFILE="${OCI_PROFILE:-DEFAULT}"
                         helm upgrade "$HELM_RELEASE" "$CHART" \
                           --namespace "$KUBE_NAMESPACE" \
                           --reuse-values \
