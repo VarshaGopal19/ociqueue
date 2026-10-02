@@ -46,6 +46,21 @@ pipeline {
             }
         }
 
+        stage('Source safety') {
+            steps {
+                sh '''
+                    set -eu
+                    for file in key.pem cert.pem docker_files.zip; do
+                      if git ls-files --error-unmatch "$file" >/dev/null 2>&1; then
+                        echo "Remove $file from Git before building"
+                        exit 1
+                      fi
+                    done
+                    test -d "$CHART/templates" || { echo 'Helm templates directory is missing'; exit 1; }
+                '''
+            }
+        }
+
 
         stage('Build and lint') {
             steps {
@@ -77,6 +92,14 @@ pipeline {
                         export KUBECONFIG="$KUBECONFIG_FILE"
                         export OCI_CLI_AUTH=api_key
                         export OCI_CLI_PROFILE="${OCI_PROFILE:-DEFAULT}"
+                        oci_config_dir="$(mktemp -d)"
+                        trap 'rm -rf "$oci_config_dir"' EXIT
+                        awk -v key_path="$OCI_CLI_KEY_FILE" '
+                            /^[[:space:]]*key_file[[:space:]]*=/ { print "key_file=" key_path; found=1; next }
+                            { print }
+                            END { if (!found) exit 1 }
+                        ' "$OCI_CLI_CONFIG_FILE" > "$oci_config_dir/config"
+                        export OCI_CLI_CONFIG_FILE="$oci_config_dir/config"
                         helm status "$HELM_RELEASE" --namespace "$KUBE_NAMESPACE" >/dev/null
                     '''
                 }
@@ -114,6 +137,14 @@ pipeline {
                         export KUBECONFIG="$KUBECONFIG_FILE"
                         export OCI_CLI_AUTH=api_key
                         export OCI_CLI_PROFILE="${OCI_PROFILE:-DEFAULT}"
+                        oci_config_dir="$(mktemp -d)"
+                        trap 'rm -rf "$oci_config_dir"' EXIT
+                        awk -v key_path="$OCI_CLI_KEY_FILE" '
+                            /^[[:space:]]*key_file[[:space:]]*=/ { print "key_file=" key_path; found=1; next }
+                            { print }
+                            END { if (!found) exit 1 }
+                        ' "$OCI_CLI_CONFIG_FILE" > "$oci_config_dir/config"
+                        export OCI_CLI_CONFIG_FILE="$oci_config_dir/config"
                         helm upgrade "$HELM_RELEASE" "$CHART" \
                           --namespace "$KUBE_NAMESPACE" \
                           --reuse-values \
