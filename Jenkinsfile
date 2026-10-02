@@ -1,5 +1,5 @@
 pipeline {
-    agent { label 'docker-helm-oke' }
+    agent any
 
     options {
         skipDefaultCheckout()
@@ -25,6 +25,17 @@ pipeline {
                 script {
                     env.IMAGE_TAG = "${env.BUILD_NUMBER}-${sh(script: 'git rev-parse --short=12 HEAD', returnStdout: true).trim()}"
                 }
+            }
+        }
+
+        stage('Agent tools') {
+            steps {
+                sh '''
+                    set -eu
+                    command -v docker >/dev/null || { echo 'Docker CLI is missing on this Jenkins node'; exit 1; }
+                    command -v helm >/dev/null || { echo 'Helm is missing on this Jenkins node'; exit 1; }
+                    docker info >/dev/null || { echo 'Jenkins cannot access the Docker daemon'; exit 1; }
+                '''
             }
         }
 
@@ -54,7 +65,7 @@ pipeline {
         }
 
         stage('Validate deployment target') {
-            when { branch 'main' }
+            when { expression { env.BRANCH_NAME == 'main' || env.GIT_BRANCH == 'origin/main' || env.GIT_LOCAL_BRANCH == 'main' } }
             steps {
                 script {
                     if (!params.KUBE_NAMESPACE?.trim() || !params.HELM_RELEASE?.trim()) {
@@ -72,7 +83,7 @@ pipeline {
         }
 
         stage('Push image') {
-            when { branch 'main' }
+            when { expression { env.BRANCH_NAME == 'main' || env.GIT_BRANCH == 'origin/main' || env.GIT_LOCAL_BRANCH == 'main' } }
             steps {
                 withCredentials([usernamePassword(credentialsId: 'ocir-push', usernameVariable: 'OCIR_USER', passwordVariable: 'OCIR_TOKEN')]) {
                     sh '''
@@ -88,7 +99,7 @@ pipeline {
         }
 
         stage('Deploy to OKE') {
-            when { branch 'main' }
+            when { expression { env.BRANCH_NAME == 'main' || env.GIT_BRANCH == 'origin/main' || env.GIT_LOCAL_BRANCH == 'main' } }
             steps {
                 withCredentials([file(credentialsId: 'oke-kubeconfig', variable: 'KUBECONFIG_FILE')]) {
                     sh '''
