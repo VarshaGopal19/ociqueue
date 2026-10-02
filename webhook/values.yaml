@@ -1,0 +1,21 @@
+image:
+  repository: eu-frankfurt-1.ocir.io/idr1ghk373xi/ociqueue_webhook
+  tag: v1.7
+  pullPolicy: IfNotPresent
+
+imagePullSecrets:
+  - name: webhook-secret  # Uncomment if needed
+
+service:
+  name: ociqueue-webhook-svc
+  type: ClusterIP
+  port: 5000
+
+replicaCount: 1
+env:
+  - name: PYTHONUNBUFFERED
+    value: "1"
+ociSecretName: oci-credentials
+nodeSelector:
+  dedicated: prometheus
+tlsSecretName: webhook-tls

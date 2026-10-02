@@ -1,0 +1,5 @@
+apiVersion: v2
+name: ociqueue_webhook
+description: A Helm chart for my Python web service
+version: 0.2.0
+appVersion: "1.0"
