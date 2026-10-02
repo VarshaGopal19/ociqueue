@@ -46,7 +46,7 @@ pipeline {
                     set -eu
                     helm lint "$CHART"
                     docker build -f Dockerfile \
-                      -t "$IMAGE_REPOSITORY:$IMAGE_TAG" docker_files
+                      -t "$IMAGE_REPOSITORY:$IMAGE_TAG" .
                 '''
             }
         }
