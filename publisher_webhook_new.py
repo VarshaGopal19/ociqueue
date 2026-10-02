@@ -183,7 +183,6 @@ def receive_alerts():
                 "region": alert.get("labels", {}).get("region", "unknown"),
                 "query_name": alert.get("labels", {}).get("query_name", "unknown"),
                 "query": alert.get("labels", {}).get("query", "unknown"),
-                "model": alert.get("labels", {}).get("model", "unknown"),
                 "context": alert.get("labels", {}).get("context", "unknown"),
                 "anomaly_last_timestamp": alert.get("labels", {}).get("anomaly_last_timestamp", "unknown"),
                 "anomaly_value_last": alert.get("labels", {}).get("anomaly_value_last", "unknown"),
