@@ -1,0 +1,80 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: {{ .Values.service.name }}
+spec:
+  replicas: {{ .Values.replicaCount }}
+  selector:
+    matchLabels:
+      app: {{ .Values.service.name }}
+  template:
+    metadata:
+      labels:
+        app: {{ .Values.service.name }}
+    spec:
+      {{- if .Values.imagePullSecrets }}
+      imagePullSecrets:
+        {{- toYaml .Values.imagePullSecrets | nindent 8 }}
+      {{- end }}
+      {{- with .Values.nodeSelector }}
+      nodeSelector:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      containers:
+        - name: webhook
+          image: "{{ .Values.image.repository }}:{{ .Values.image.tag }}"
+          imagePullPolicy: {{ .Values.image.pullPolicy }}
+          ports:
+            - containerPort: {{ .Values.service.port }}
+          env:
+            - name: PYTHONUNBUFFERED
+              value: "1"
+            - name: OCI_QUEUE_OCID
+              valueFrom:
+                secretKeyRef:
+                  name: {{ .Values.ociSecretName }}
+                  key: OCI_QUEUE_OCID
+            - name: OCI_TENANCY_OCID
+              valueFrom:
+                secretKeyRef:
+                  name: {{ .Values.ociSecretName }}
+                  key: OCI_TENANCY_OCID
+            - name: OCI_USER_OCID
+              valueFrom:
+                secretKeyRef:
+                  name: {{ .Values.ociSecretName }}
+                  key: OCI_USER_OCID
+            - name: OCI_FINGERPRINT
+              valueFrom:
+                secretKeyRef:
+                  name: {{ .Values.ociSecretName }}
+                  key: OCI_FINGERPRINT
+            - name: OCI_REGION
+              valueFrom:
+                secretKeyRef:
+                  name: {{ .Values.ociSecretName }}
+                  key: OCI_REGION
+            - name: QUEUE_SERVICE_ENDPOINT
+              valueFrom:
+                secretKeyRef:
+                  name: {{ .Values.ociSecretName }}
+                  key: QUEUE_SERVICE_ENDPOINT
+            - name: OCI_PRIVATE_KEY_CONTENT
+              valueFrom:
+                secretKeyRef:
+                  name: {{ .Values.ociSecretName }}
+                  key: OCI_PRIVATE_KEY_CONTENT
+          volumeMounts:
+            # TLS certificate and key
+            - name: tls-certs
+              mountPath: /app/cert.pem
+              subPath: tls.crt
+              readOnly: true
+            - name: tls-certs
+              mountPath: /app/key.pem
+              subPath: tls.key
+              readOnly: true
+      volumes:
+        - name: tls-certs
+          secret:
+            secretName: {{ .Values.tlsSecretName }}
