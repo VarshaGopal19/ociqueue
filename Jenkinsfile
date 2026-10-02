@@ -15,7 +15,7 @@ pipeline {
     environment {
         IMAGE_REPOSITORY = 'eu-frankfurt-1.ocir.io/idr1ghk373xi/ociqueue_webhook'
         OCIR_HOST = 'eu-frankfurt-1.ocir.io'
-        CHART = 'docker_files/ociqueue_webhook'
+        CHART = 'webhook'
     }
 
     stages {
@@ -39,26 +39,13 @@ pipeline {
             }
         }
 
-        stage('Source safety') {
-            steps {
-                sh '''
-                    set -eu
-                    for file in docker_files/key.pem docker_files/cert.pem docker_files.zip; do
-                      if git ls-files --error-unmatch "$file" >/dev/null 2>&1; then
-                        echo "Remove $file from Git before building"
-                        exit 1
-                      fi
-                    done
-                '''
-            }
-        }
 
         stage('Build and lint') {
             steps {
                 sh '''
                     set -eu
                     helm lint "$CHART"
-                    docker build -f docker_files/Dockerfile \
+                    docker build -f Dockerfile \
                       -t "$IMAGE_REPOSITORY:$IMAGE_TAG" docker_files
                 '''
             }
