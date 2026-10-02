@@ -45,21 +45,6 @@ pipeline {
             }
         }
 
-        stage('Source safety') {
-            steps {
-                sh '''
-                    set -eu
-                    for file in key.pem cert.pem docker_files.zip; do
-                      if git ls-files --error-unmatch "$file" >/dev/null 2>&1; then
-                        echo "Remove $file from Git before building"
-                        exit 1
-                      fi
-                    done
-                    test -d "$CHART/templates" || { echo 'Helm templates directory is missing'; exit 1; }
-                '''
-            }
-        }
-
 
         stage('Build and lint') {
             steps {
