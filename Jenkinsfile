@@ -16,6 +16,7 @@ pipeline {
         IMAGE_REPOSITORY = 'eu-frankfurt-1.ocir.io/idr1ghk373xi/ociqueue_webhook'
         OCIR_HOST = 'eu-frankfurt-1.ocir.io'
         CHART = 'webhook'
+        OCI_CLI_AUTH = 'instance_principal'
     }
 
     stages {
@@ -40,6 +41,21 @@ pipeline {
                     command -v docker >/dev/null || { echo 'Docker CLI is missing on this Jenkins node'; exit 1; }
                     command -v helm >/dev/null || { echo 'Helm is missing on this Jenkins node'; exit 1; }
                     docker info >/dev/null || { echo 'Jenkins cannot access the Docker daemon'; exit 1; }
+                '''
+            }
+        }
+
+        stage('Source safety') {
+            steps {
+                sh '''
+                    set -eu
+                    for file in key.pem cert.pem docker_files.zip; do
+                      if git ls-files --error-unmatch "$file" >/dev/null 2>&1; then
+                        echo "Remove $file from Git before building"
+                        exit 1
+                      fi
+                    done
+                    test -d "$CHART/templates" || { echo 'Helm templates directory is missing'; exit 1; }
                 '''
             }
         }
